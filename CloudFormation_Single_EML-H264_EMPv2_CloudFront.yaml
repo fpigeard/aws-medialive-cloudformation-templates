@@ -1,0 +1,344 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS MediaLive and MediaPackage v2 OTT Service'
+
+Parameters:
+  InputS3Bucket:
+    Type: String
+    Description: S3 bucket containing input video files
+    Default: inputsource
+
+Resources:
+  MediaPackageChannelGroup:
+    Type: AWS::MediaPackageV2::ChannelGroup
+    Properties:
+      ChannelGroupName: !Join ['-', [!Ref 'AWS::StackName', 'channel-group']]
+      Description: 'Channel Group for Live Streaming'
+
+  MediaPackageChannel:
+    Type: AWS::MediaPackageV2::Channel
+    DependsOn: MediaPackageChannelGroup
+    Properties:
+      ChannelGroupName: !Join ['-', [!Ref 'AWS::StackName', 'channel-group']]
+      ChannelName: !Join ['-', [!Ref 'AWS::StackName', 'channel']]
+      Description: 'Live Streaming Channel'
+      InputSwitchConfiguration:
+        MQCSInputSwitching: true
+      InputType: CMAF
+
+  MediaLiveInput:
+    Type: AWS::MediaLive::Input
+    Properties:
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'input']]
+      Sources:
+        - Url: !Join ['', ['s3://', !Ref 'InputS3Bucket', '/formula_1-1.mp4']]
+      Type: MP4_FILE
+
+  MediaLiveRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: medialive.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: MediaLiveAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 'mediapackagev2:*'
+                Resource: '*'
+
+  MediaLiveChannel:
+    Type: AWS::MediaLive::Channel
+    Properties:
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'channel']]
+      RoleArn: !GetAtt MediaLiveRole.Arn
+      ChannelClass: SINGLE_PIPELINE
+      InputSpecification:
+        Codec: AVC
+        MaximumBitrate: MAX_20_MBPS
+        Resolution: HD
+      InputAttachments:
+        - InputId: !Ref MediaLiveInput
+          InputSettings:
+            AudioSelectors: []
+            CaptionSelectors: []
+            DeblockFilter: DISABLED
+            DenoiseFilter: DISABLED
+            FilterStrength: 1
+            InputFilter: AUTO
+            SourceEndBehavior: LOOP
+      EncoderSettings:
+        TimecodeConfig:
+          Source: EMBEDDED
+          SyncThreshold: 1
+        AudioDescriptions:
+          - Name: audio1
+            CodecSettings:
+              AacSettings: {}
+        VideoDescriptions:
+          - CodecSettings:
+              H264Settings:
+                Bitrate: 145000
+                FramerateDenominator: 1001
+                FramerateNumerator: 60000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: MAIN
+                RateControlMode: CBR
+                SceneChangeDetect: ENABLED
+                Syntax: DEFAULT
+                TimecodeInsertion: PIC_TIMING_SEI
+            Height: 360
+            Name: H264_640
+            Sharpness: 100
+            Width: 640
+
+          - CodecSettings:
+              H264Settings:
+                Bitrate: 1600000
+                FramerateDenominator: 1001
+                FramerateNumerator: 60000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: MAIN
+                RateControlMode: CBR
+                SceneChangeDetect: ENABLED
+                Syntax: DEFAULT
+                TimecodeInsertion: PIC_TIMING_SEI
+            Height: 540
+            Name: H264_960
+            Sharpness: 100
+            Width: 960
+
+          - CodecSettings:
+              H264Settings:
+                Bitrate: 2400000
+                FramerateDenominator: 1001
+                FramerateNumerator: 60000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: HIGH
+                RateControlMode: CBR
+                SceneChangeDetect: ENABLED
+                Syntax: DEFAULT
+                TimecodeInsertion: PIC_TIMING_SEI
+            Height: 720
+            Name: H264_1280
+            Sharpness: 100
+            Width: 1280
+
+          - CodecSettings:
+              H264Settings:
+                Bitrate: 4500000
+                FramerateDenominator: 1001
+                FramerateNumerator: 60000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: HIGH
+                RateControlMode: CBR
+                SceneChangeDetect: ENABLED
+                Syntax: DEFAULT
+                TimecodeInsertion: PIC_TIMING_SEI
+            Height: 1080
+            Name: H264_1920
+            Sharpness: 100
+            Width: 1920
+
+        OutputGroups:
+          - OutputGroupSettings:
+              CmafIngestGroupSettings:
+                Destination:
+                  DestinationRefId: cmaf-output
+                SegmentLength: 1
+                SegmentLengthUnits: SECONDS
+            Outputs:
+              - AudioDescriptionNames: []
+                CaptionDescriptionNames: []
+                OutputName: H264_640
+                OutputSettings:
+                  CmafIngestOutputSettings:
+                    NameModifier: "640"
+                VideoDescriptionName: H264_640
+
+              - AudioDescriptionNames: []
+                CaptionDescriptionNames: []
+                OutputName: H264_960
+                OutputSettings:
+                  CmafIngestOutputSettings:
+                    NameModifier: "960"
+                VideoDescriptionName: H264_960
+
+              - AudioDescriptionNames: []
+                CaptionDescriptionNames: []
+                OutputName: H264_1280
+                OutputSettings:
+                  CmafIngestOutputSettings:
+                    NameModifier: "1280"
+                VideoDescriptionName: H264_1280
+
+              - AudioDescriptionNames: []
+                CaptionDescriptionNames: []
+                OutputName: H264_1920
+                OutputSettings:
+                  CmafIngestOutputSettings:
+                    NameModifier: "1920"
+                VideoDescriptionName: H264_1920
+
+              - AudioDescriptionNames:
+                  - audio1
+                CaptionDescriptionNames: []
+                OutputName: AAC_1
+                OutputSettings:
+                  CmafIngestOutputSettings:
+                    NameModifier: "aac"
+
+      Destinations:
+        - Id: cmaf-output
+          Settings:
+            - Url: !Select [0, !GetAtt MediaPackageChannel.IngestEndpointUrls]
+
+  MediaPackageOriginEndpoint:
+    Type: AWS::MediaPackageV2::OriginEndpoint
+    DependsOn: MediaPackageChannel
+    Properties:
+      ChannelGroupName: !Join ['-', [!Ref 'AWS::StackName', 'channel-group']]
+      ChannelName: !Join ['-', [!Ref 'AWS::StackName', 'channel']]
+      ContainerType: CMAF
+      HlsManifests:
+        - ManifestName: index
+      OriginEndpointName: !Join ['-', [!Ref 'AWS::StackName', 'endpoint']]
+      StartoverWindowSeconds: 10800
+
+  OriginEndpointPolicy:
+    Type: AWS::MediaPackageV2::OriginEndpointPolicy
+    DependsOn: MediaPackageOriginEndpoint
+    Properties:
+      ChannelGroupName: !Join ['-', [!Ref 'AWS::StackName', 'channel-group']]
+      ChannelName: !Join ['-', [!Ref 'AWS::StackName', 'channel']]
+      OriginEndpointName: !Join ['-', [!Ref 'AWS::StackName', 'endpoint']]
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowRequestsFromCloudFront
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - mediapackagev2:GetHeadObject
+              - mediapackagev2:GetObject
+            Resource: !GetAtt MediaPackageOriginEndpoint.Arn
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Join 
+                  - ''
+                  - - 'arn:aws:cloudfront::'
+                    - !Ref 'AWS::AccountId'
+                    - ':distribution/'
+                    - !Ref CloudFrontDistribution
+
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Join ['-', [!Ref 'AWS::StackName', 'oac-emp']]
+        OriginAccessControlOriginType: mediapackagev2
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ManifestCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Join ['-', [!Ref 'AWS::StackName', 'manifest-cache-policy']]
+        Comment: Policy for caching Elemental MediaPackage manifest requests
+        DefaultTTL: 86400
+        MaxTTL: 86400
+        MinTTL: 1
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: whitelist
+            QueryStrings:
+              - start
+              - end
+
+  ManifestOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: !Join ['-', [!Ref 'AWS::StackName', 'manifest-origin-request-policy']]
+        CookiesConfig:
+          CookieBehavior: none
+        HeadersConfig:
+          HeaderBehavior: none
+        QueryStringsConfig:
+          QueryStringBehavior: whitelist
+          QueryStrings:
+            - start
+            - end
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Join ['-', [!Ref 'AWS::StackName', 'channel']]
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !GetAtt MediaPackageChannelGroup.EgressDomain
+            Id: empv2
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+            OriginAccessControlId: !Ref CloudFrontOAC
+        DefaultCacheBehavior:
+          TargetOriginId: empv2
+          ViewerProtocolPolicy: allow-all
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          OriginRequestPolicyId: !Ref ManifestOriginRequestPolicy
+        CacheBehaviors:
+          - PathPattern: "*.m3u8"
+            TargetOriginId: empv2
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
+            CachePolicyId: !Ref ManifestCachePolicy
+            OriginRequestPolicyId: !Ref ManifestOriginRequestPolicy
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+
+Outputs:
+  PlaybackUrl:
+    Description: Use this manifest URL to stream the content
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt CloudFrontDistribution.DomainName
+        - '/out/'
+        - !Select [0, !GetAtt MediaPackageOriginEndpoint.HlsManifestUrls]
+  CloudFrontDomain:
+    Description: CloudFront Distribution Domain Name
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  MediaPackageChannelIngestUrl:
+    Description: MediaPackage Channel Ingest URL
+    Value: !Select [0, !GetAtt MediaPackageChannel.IngestEndpointUrls]
