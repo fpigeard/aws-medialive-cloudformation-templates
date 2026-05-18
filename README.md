@@ -47,3 +47,13 @@ aws cloudformation create-stack \
   --capabilities CAPABILITY_IAM \
   --region eu-west-1
 ```
+
+### Stopping workflows and cleaning up AWS resources after testing
+
+To avoid unnecessary charges, make sure to stop the workflow when the MediaLive channel is not in use. Once your tests are complete, also ensure you delete the CloudFormation stack by following the steps below:
+
+* Sign in to the AWS Console
+* Go to CloudFormation
+* Select the relevant stack
+* Click “Delete”
+* Confirm the action
