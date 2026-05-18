@@ -6,10 +6,10 @@ Ready-to-use AWS CloudFormation templates for live streaming workflows using AWS
 
 | Template | Codec | Rate Control | Resiliency | Latency |
 |---|---|---|---|---|
+| [Low-Latency HLS](CloudFormation_Dual-QVBR_LL-HLS_EML-H264_EMPv2_CloudFront.yaml) | H.264 | QVBR | Standard |Low-Latency |
 | [Single H264](CloudFormation_Single_EML-H264_EMPv2_CloudFront.yaml) | H.264 | CBR | Single-pipeline | Standard-Latancy |
 | [Dual H264 CBR](CloudFormation_Dual-CBR_EML-H264_EMPv2_CloudFront.yaml) | H.264 | CBR | Standard | Standard-Latancy |
 | [Dual H264 QVBR](CloudFormation_Dual-QVBR_EML-H264_EMPv2_CloudFront.yaml) | H.264 | QVBR | Standard | Standard-Latancy |
-| [Dual H264 QVBR LL-HLS](CloudFormation_Dual-QVBR_LL-HLS_EML-H264_EMPv2_CloudFront.yaml) | H.264 | QVBR | Standard |Low-Latency |
 | [HEVC](CloudFormation_EML-HEVC_MediaPackagev2_CloudFront.yaml) | H.265 (HEVC) | CBR | Single-pipeline | Standard-Latancy |
 
 ---
